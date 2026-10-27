@@ -2,13 +2,15 @@
 
 **Diagnóstico y resolución documentados de un caso real**
 
+> 📘 **Acerca de este repositorio.** Este es un repositorio público con fines educativos. En él documento fallas de software que se han presentado en mi equipo o en los equipos de mis alumnos, junto con el procedimiento que seguimos para resolverlas, con la intención de que sirva como material de consulta para la comunidad estudiantil. Si a alguien fuera de la comunidad educativa le resulta útil, es bienvenido a usarlo. No tiene fines de lucro.
+
 | | |
 |---|---|
 | **Software afectado** | NI LabVIEW 2026 Q3 (64-bit) · paquete `ni-metauninstaller 26.5.0.49246` |
 | **Sistema** | Windows 64-bit |
-| **Síntoma** | La instalación se detiene con el código de error **2705** |
+| **Error presentado** | La instalación se detiene con el código de error **2705** |
 | **Causa identificada** | La acción personalizada *NIPaths* no logra resolver la carpeta *Documentos públicos* de Windows |
-| **Tipo de solución** | Alternativa (*workaround*) mediante dos valores de registro |
+| **Tipo de solución** | Solución alterna: dos valores en el registro de Windows |
 
 > ⚠️ **Aviso.** Esta es una solución opcional, basada en los problemas que encontré en mi equipo. No es un procedimiento oficial de NI ni una solución definitiva: tu error 2705 podría tener otra causa. Antes de aplicar la solución de la [sección 6](#6-solución-aplicada), sigue el diagnóstico de la [sección 4](#4-procedimiento-de-diagnóstico) para confirmar que se trata del mismo caso. Todos los cambios de registro son reversibles.
 
@@ -22,13 +24,12 @@
 4. [Procedimiento de diagnóstico](#4-procedimiento-de-diagnóstico)
 5. [Análisis de causa raíz](#5-análisis-de-causa-raíz)
 6. [Solución aplicada](#6-solución-aplicada)
-7. [Incidencia secundaria: paquete corrupto en el ISO](#7-incidencia-secundaria-paquete-corrupto-en-el-iso)
-8. [Cierre: limpieza y verificación](#8-cierre-limpieza-y-verificación)
-9. [Metodología: qué aprender de este caso](#9-metodología-qué-aprender-de-este-caso)
-10. [Anexo A: script de diagnóstico y corrección](#anexo-a-script-de-diagnóstico-y-corrección)
-11. [Anexo B: configuración de LabVIEW con Arduino](#anexo-b-configuración-de-labview-con-arduino)
-12. [Referencias](#referencias)
-13. [Summary in English](#summary-in-english)
+7. [Problema adicional: paquete dañado en el ISO](#7-problema-adicional-paquete-dañado-en-el-iso)
+8. [Limpieza y verificación final](#8-limpieza-y-verificación-final)
+9. [Recomendaciones para casos similares](#9-recomendaciones-para-casos-similares)
+10. [Anexo: script de diagnóstico y corrección](#anexo-script-de-diagnóstico-y-corrección)
+11. [Referencias](#referencias)
+12. [Summary in English](#summary-in-english)
 
 ---
 
@@ -46,7 +47,7 @@ Additional error information:
   This may indicate a problem with this package. The error code is 2705.
 ```
 
-El botón *Try Again* reproducía el error de forma idéntica. El fallo ocurría tanto con el instalador en línea como con la imagen ISO offline, lo que ya sugería que el problema no estaba en la descarga, sino en el equipo.
+El botón *Try Again* reproducía el error de forma idéntica. La falla ocurría tanto con el instalador en línea como con la imagen ISO offline, lo que ya sugería que el problema no estaba en la descarga, sino en el equipo.
 
 ---
 
@@ -128,7 +129,7 @@ reg delete "HKLM\SOFTWARE\WOW6432Node\National Instruments" /f
 
 ### 3.5 Resultado
 
-Con el equipo totalmente limpio, ya sin componentes registrados, carpetas ni claves de NI, el error **seguía apareciendo**. Esto descartaba la hipótesis de los restos de instalación y obligaba a buscar la causa en otra parte. Para eso es necesario leer qué hace exactamente el instalador en el momento del fallo.
+Con el equipo totalmente limpio, ya sin componentes registrados, carpetas ni claves de NI, el error **seguía apareciendo**. Esto descartaba la hipótesis de los restos de instalación y obligaba a buscar la causa en otra parte. Para eso es necesario leer qué hace exactamente el instalador en el momento de la falla.
 
 ---
 
@@ -156,7 +157,7 @@ Para encontrar cuál de todos contiene el error:
 Select-String -Path "$env:TEMP\MSI*.LOG" -Pattern "2705" -List | Select-Object Path
 ```
 
-Y para ver el contexto del fallo dentro de ese archivo:
+Y para ver el contexto de la falla dentro de ese archivo:
 
 ```powershell
 Select-String -Path "<ruta del log>" -Pattern "2705|Return value 3" -Context 15,3
@@ -175,7 +176,7 @@ Product: NI Uninstaller 26.5.0 -- ... The error code is 2705. The arguments are:
 Action ended: CostInitialize. Return value 3.
 ```
 
-La acción que falla es `CostInitialize`, que es justamente la que construye el árbol de carpetas para calcular el espacio necesario. En ese momento todavía no se ha copiado ningún archivo: **el fallo ocurre al interpretar la tabla `Directory`**, no al escribir en disco. Por eso tampoco tenían relación el espacio libre, el antivirus ni el firewall.
+La acción que falla es `CostInitialize`, que es justamente la que construye el árbol de carpetas para calcular el espacio necesario. En ese momento todavía no se ha copiado ningún archivo: **la falla ocurre al interpretar la tabla `Directory`**, no al escribir en disco. Por eso tampoco tenían relación el espacio libre, el antivirus ni el firewall.
 
 Un dato adicional: en los logs del mismo intento, **todos los demás paquetes de NI se instalaban correctamente** y solo fallaba `MetaUninstaller.msi`. La pregunta era entonces qué tiene ese paquete de diferente.
 
@@ -231,7 +232,7 @@ El código `2147942403` en hexadecimal es `0x80070003`, que corresponde al error
 
 ### 5.4 Conclusión
 
-La cadena completa del fallo es:
+La cadena completa de la falla es:
 
 ```
 SHGetFolderPath(Documentos públicos) falla
@@ -257,7 +258,7 @@ Test-Path "C:\Users\Public\Documents"          # True
 [Environment]::GetFolderPath("CommonDocuments") # C:\Users\Public\Documents
 ```
 
-Las claves `User Shell Folders`, `ProfileList` y `FolderDescriptions` también tenían sus valores de fábrica. Es decir, **desde la sesión del usuario Windows sí encontraba la carpeta; la falla solo ocurría dentro del contexto de la instalación.** No fue posible determinar el motivo exacto dentro de Windows, por lo que la solución que sigue **evita** la consulta en lugar de reparar su causa. Por eso se considera una alternativa (*workaround*) y no una corrección definitiva.
+Las claves `User Shell Folders`, `ProfileList` y `FolderDescriptions` también tenían sus valores de fábrica. Es decir, **desde la sesión del usuario Windows sí encontraba la carpeta; la falla solo ocurría dentro del contexto de la instalación.** No fue posible determinar el motivo exacto dentro de Windows, por lo que la solución que sigue **evita** la consulta en lugar de corregir su origen. Por eso se considera una solución alterna y no una corrección definitiva.
 
 <details>
 <summary>Comandos para verificar la configuración de "Documentos públicos"</summary>
@@ -336,7 +337,7 @@ foreach ($k in "HKLM:\SOFTWARE\National Instruments\Common\Installer","HKLM:\SOF
 
 ---
 
-## 7. Incidencia secundaria: paquete corrupto en el ISO
+## 7. Problema adicional: paquete dañado en el ISO
 
 Una vez superado el error 2705, la instalación desde la imagen ISO se detuvo con un error distinto:
 
@@ -350,19 +351,19 @@ from actual checksum '8d0e…'. The package may be corrupted.
 
 **Solución.** Con el error 2705 ya resuelto, se usó el **instalador en línea** de LabVIEW, seleccionando solo los componentes necesarios. A diferencia del ISO (aproximadamente 34 GB), el instalador en línea descarga únicamente lo seleccionado, lo que además resolvía la falta de espacio en el disco.
 
-Componentes recomendados para trabajar con Arduino o ESP32:
+Componentes seleccionados en este caso:
 
 | Componente | ¿Instalar? | Motivo |
 |---|---|---|
 | LabVIEW (64-bit) | ✅ | Entorno de programación |
-| JKI VI Package Manager | ✅ | Gestor de complementos de LabVIEW |
-| NI-VISA | ✅ | Comunicación por puerto serie/USB |
-| NI-DAQmx | Opcional | Solo para tarjetas de adquisición de NI (p. ej. myDAQ). Puede instalarse después |
-| Resto de drivers y módulos | ❌ | No son necesarios para este uso y ocupan espacio |
+| JKI VI Package Manager | ✅ | Administrador de complementos de LabVIEW |
+| NI-VISA | ✅ | Comunicación por puerto serial/USB |
+| NI-DAQmx | Opcional | Solo para tarjetas de adquisición de NI (por ejemplo, myDAQ). Se puede instalar después |
+| Demás controladores y módulos | ❌ | No se necesitaban y ocupan bastante espacio |
 
 ---
 
-## 8. Cierre: limpieza y verificación
+## 8. Limpieza y verificación final
 
 El registro detallado de Windows Installer debe desactivarse al terminar, porque genera archivos grandes en cada instalación futura:
 
@@ -377,20 +378,20 @@ Si durante las pruebas se desactivaron el antivirus o el firewall, deben volver 
 
 ---
 
-## 9. Metodología: qué aprender de este caso
+## 9. Recomendaciones para casos similares
 
-Más allá de la solución puntual, el caso ilustra un método de diagnóstico aplicable a muchos otros errores de instalación:
+Más allá de la solución puntual, de este caso se desprenden algunas recomendaciones que aplican a muchas otras fallas de instalación:
 
 1. **Descartar primero la causa más común.** La limpieza de restos de NI no resolvió el problema, pero eliminó la explicación más probable y redujo el campo de búsqueda.
 2. **No adivinar: obtener evidencia.** El mensaje de error en pantalla ("problem with this package") era engañoso. El log detallado mostró exactamente qué acción fallaba y por qué.
 3. **Comparar lo que funciona con lo que no.** Que todos los paquetes se instalaran excepto uno indicaba que la causa estaba en algo exclusivo de ese paquete.
-4. **Ir a la fuente.** Inspeccionar las tablas del MSI permitió entender la lógica de NIPaths y, a partir de ella, encontrar un punto de intervención: la ruta en el registro.
-5. **Intervenir de forma mínima y reversible.** La solución consiste en dos valores de registro con las rutas estándar, sin modificar el paquete ni el sistema más allá de lo necesario.
+4. **Ir a la fuente.** Inspeccionar las tablas del MSI permitió entender la lógica de NIPaths y, a partir de ella, identificar en qué punto se podía intervenir: la ruta en el registro.
+5. **Hacer el cambio mínimo y que se pueda revertir.** La solución consiste en dos valores de registro con las rutas estándar, sin modificar el paquete ni el sistema más allá de lo necesario.
 6. **Documentar.** Este documento existe para que el siguiente caso tome minutos y no días.
 
 ---
 
-## Anexo A: script de diagnóstico y corrección
+## Anexo: script de diagnóstico y corrección
 
 El archivo [`fix-ni-2705.ps1`](fix-ni-2705.ps1) automatiza las secciones 4, 5 y 6.
 
@@ -413,26 +414,12 @@ powershell -ExecutionPolicy Bypass -File .\fix-ni-2705.ps1 -Apply
 
 ---
 
-## Anexo B: configuración de LabVIEW con Arduino
-
-Una vez instalado LabVIEW, estos son los pasos para comunicarlo con una placa Arduino.
-
-1. **Instalar LabVIEW Hobbyist Toolkit**, la versión actual de la biblioteca LINX. Se instala desde *NI Package Manager → Browse Products → "Hobbyist"* o desde la [página de descarga de NI](https://www.ni.com/en/support/downloads/tools-network/download.labview-hobbyist-toolkit.html). Debe coincidir en versión y arquitectura (32/64 bits) con LabVIEW. El paquete antiguo *Digilent LINX* de VI Package Manager está descontinuado.
-2. **Instalar el controlador USB de la placa.** El Arduino IDE incluye los controladores para placas originales; las placas genéricas suelen requerir el controlador del chip **CH340**. La placa debe aparecer en *Administrador de dispositivos → Puertos (COM y LPT)* con un número de puerto COM.
-3. **Cargar el firmware LINX en la placa.** En LabVIEW: *Tools → Hobbyist → LINX Firmware Wizard* → familia *Arduino* → modelo de la placa → *Serial/USB* → *Pre-Built Firmware* → puerto COM. Solo se hace una vez por placa. El Arduino IDE debe estar cerrado, porque ocupa el puerto.
-4. **Verificar con un ejemplo.** *Help → Find Examples*, buscar *Blink*, seleccionar el puerto COM y ejecutar. El LED integrado (pin 13) debe parpadear. El programa se detiene con su botón *Stop* y no con el botón de abortar, para que el puerto se cierre correctamente.
-
-Las funciones se encuentran en la paleta **Hobbyist** del diagrama de bloques: `Open.vi`, `Close.vi` y la carpeta `Peripherals` (Analog, Digital, PWM, I2C, SPI, UART).
-
----
-
 ## Referencias
 
 - [Labview Install error (2705) — NI Community](https://forums.ni.com/t5/LabVIEW/Labview-Install-error/m-p/4325397)
 - [Error Windows 10 (ni-metauninstaller 2705) — NI Community](https://forums.ni.com/t5/LabVIEW/Error-Windows-10/m-p/4307801)
 - [Windows Installer error messages — Microsoft Learn](https://learn.microsoft.com/windows/win32/msi/windows-installer-error-messages)
 - [Directory table — Microsoft Learn](https://learn.microsoft.com/windows/win32/msi/directory-table)
-- [LabVIEW Hobbyist Toolkit — NI](https://www.ni.com/en/support/downloads/tools-network/download.labview-hobbyist-toolkit.html)
 
 ---
 
